@@ -6,6 +6,9 @@ Since the default keyboard shortcuts are either hard to remember or too far to p
 
 The document should be built with `PdfLaTeX`.
 
+## Inspiration
+Modified [AOE2-CheatSheet](https://github.com/YizeWang/Age-of-Empires-2-Cheat-Sheet/tree/master), to fit my usecase.
+
 ## Reference
 
 - Keyboard Shortcuts by Meng: https://www.bilibili.com/video/av22359198
@@ -17,3 +20,5 @@ The document should be built with `PdfLaTeX`.
 - Build Order Reference: https://buildorderreference.com/
 
 - Hera Build Orders: https://www.patreon.com/heraaoe2/posts
+
+
