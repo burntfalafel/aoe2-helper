@@ -110,8 +110,46 @@ still absent from `--list-devices`. Do not run the whole macro program with
 specific udev rule is safer on a shared machine. Wayland mode prints the active
 row and mappings in the terminal because the small X11 overlay is unavailable.
 
+If no accessible devices are listed, inspect permissions and current groups:
+
+```bash
+ls -l /dev/input/event* /dev/uinput
+id -nG
+getent group input
+```
+
+If `input` is missing from `id -nG`, add it and then fully log out of the desktop
+session and back in (opening a new terminal is not sufficient):
+
+```bash
+sudo usermod -aG input "$USER"
+```
+
+If `/dev/uinput` does not exist, load its kernel module once with
+`sudo modprobe uinput`. Persistent module loading and device permissions depend
+on the Linux distribution.
+
 Edit `keybindings.ini` to change labels, triggers, or sent keys. Its entry format
 is `trigger = keys_to_send | Action name`.
+`key_hold_ms` controls how long each generated key stays pressed; increase it if
+AoE2 misses inputs on a low-frame-rate system.
+
+## Troubleshooting input
+
+If an overlay appears, the X11 backend is running. An X11 overlay can itself
+appear through XWayland even when the desktop session is Wayland; that does not
+mean its synthetic X11 keys will reach a Proton game. Use `--backend wayland` on
+a Wayland session.
+
+To distinguish backend trouble from an AoE2 hotkey mismatch, start on the
+Economy row, focus a text editor, and press `1` once. It should type `qq`:
+
+- Nothing appears: the selected backend is not injecting input correctly.
+- `qq` appears: injection works; check that AoE2's Economy Buildings menu and
+  House hotkeys are both configured as `Q`.
+
+Generated keys are held for `key_hold_ms` rather than pressed and released in
+the same instant. The default of 40 ms should be visible to a 60 FPS game.
 
 ## Suggested remaining one-hand bindings
 

@@ -149,7 +149,9 @@ def configure_x11() -> tuple[ctypes.CDLL, ctypes.CDLL]:
 
 def read_config(
     path: Path,
-) -> tuple[dict[str, dict[str, tuple[list[str], str]]], tuple[str, ...], str, int, bool, str]:
+) -> tuple[
+    dict[str, dict[str, tuple[list[str], str]]], tuple[str, ...], str, int, int, bool, str
+]:
     config = configparser.ConfigParser(inline_comment_prefixes=("#",))
     if not config.read(path):
         raise RuntimeError(f"Cannot read configuration: {path}")
@@ -173,11 +175,14 @@ def read_config(
 
     toggle = general.get("toggle", "grave").strip()
     delay_ms = general.getint("key_delay_ms", 35)
+    hold_ms = general.getint("key_hold_ms", 40)
     overlay = general.getboolean("show_overlay", True)
     wayland_device = general.get("wayland_device", "").strip()
     if not 0 <= delay_ms <= 500:
         raise RuntimeError("key_delay_ms must be between 0 and 500")
-    return bindings, modes, toggle, delay_ms, overlay, wayland_device
+    if not 1 <= hold_ms <= 500:
+        raise RuntimeError("key_hold_ms must be between 1 and 500")
+    return bindings, modes, toggle, delay_ms, hold_ms, overlay, wayland_device
 
 
 class Overlay:
@@ -263,12 +268,14 @@ class MacroDaemon:
         modes: tuple[str, ...],
         toggle: str,
         delay_ms: int,
+        hold_ms: int,
         overlay: Overlay,
     ) -> None:
         self.bindings = bindings
         self.modes = modes
         self.toggle = toggle
         self.delay = delay_ms / 1000
+        self.hold = hold_ms / 1000
         self.overlay = overlay
         self.mode = modes[0]
         self.down: set[int] = set()
@@ -314,6 +321,8 @@ class MacroDaemon:
             if token.lower() in MOUSE_BUTTONS:
                 button = MOUSE_BUTTONS[token.lower()]
                 self.xtst.XTestFakeButtonEvent(self.display, button, True, 0)
+                self.x11.XFlush(self.display)
+                time.sleep(self.hold)
                 self.xtst.XTestFakeButtonEvent(self.display, button, False, 0)
             else:
                 parts = token.split("+")
@@ -321,6 +330,8 @@ class MacroDaemon:
                 codes = [self.keycode(name) for name in names]
                 for code in codes:
                     self.xtst.XTestFakeKeyEvent(self.display, code, True, 0)
+                self.x11.XFlush(self.display)
+                time.sleep(self.hold)
                 for code in reversed(codes):
                     self.xtst.XTestFakeKeyEvent(self.display, code, False, 0)
             self.x11.XFlush(self.display)
@@ -401,14 +412,18 @@ def wayland_keycode(name: str, ecodes) -> int:
 
 def accessible_input_devices(evdev) -> list[tuple[str, str]]:
     devices: list[tuple[str, str]] = []
-    # Calling without newer optional arguments also supports python-evdev 1.6,
-    # which ships with Ubuntu 22.04.
-    for path in evdev.list_devices():
-        device = evdev.InputDevice(path)
+    # Scan directly: python-evdev releases disagree on whether list_devices()
+    # requires write access. Reading and grabbing an input node only needs read
+    # access; output is handled separately through /dev/uinput.
+    for path in sorted(Path("/dev/input").glob("event*")):
+        try:
+            device = evdev.InputDevice(str(path))
+        except (PermissionError, OSError):
+            continue
         try:
             keys = device.capabilities().get(evdev.ecodes.EV_KEY, [])
-            if evdev.ecodes.KEY_1 in keys and evdev.ecodes.KEY_GRAVE in keys:
-                devices.append((path, device.name))
+            if keys:
+                devices.append((str(path), device.name))
         finally:
             device.close()
     return devices
@@ -419,7 +434,12 @@ def print_input_devices() -> None:
     devices = accessible_input_devices(evdev)
     if not devices:
         print("No accessible keyboard devices found.")
-        print("Check membership of the input group and log out/in after changing it.")
+        event_nodes = list(Path("/dev/input").glob("event*"))
+        if event_nodes:
+            print(f"Found {len(event_nodes)} event nodes, but none are readable keyboard devices.")
+            print("Check input-group membership, then fully log out and back in.")
+        else:
+            print("No /dev/input/event* nodes exist; check that the input subsystem is available.")
         return
     for path, name in devices:
         print(f"{path}: {name}")
@@ -432,7 +452,10 @@ def choose_input_device(evdev, device_spec: str):
             "or set general.wayland_device in keybindings.ini"
         )
     if Path(device_spec).exists():
-        return evdev.InputDevice(device_spec)
+        try:
+            return evdev.InputDevice(device_spec)
+        except PermissionError as error:
+            raise RuntimeError(f"Permission denied reading input device: {device_spec}") from error
 
     matches = [item for item in accessible_input_devices(evdev) if device_spec.lower() in item[1].lower()]
     if len(matches) == 1:
@@ -450,6 +473,7 @@ class WaylandDaemon:
         modes: tuple[str, ...],
         toggle: str,
         delay_ms: int,
+        hold_ms: int,
         device_spec: str,
     ) -> None:
         self.evdev = load_evdev()
@@ -459,6 +483,7 @@ class WaylandDaemon:
         self.mode = modes[0]
         self.toggle = toggle
         self.delay = delay_ms / 1000
+        self.hold = hold_ms / 1000
         self.device = choose_input_device(self.evdev, device_spec)
         self.output = None
         self.trigger_codes: dict[int, str] = {}
@@ -494,6 +519,8 @@ class WaylandDaemon:
                 }
                 code = buttons[lowered]
                 self.emit_key(code, 1)
+                self.output.syn()
+                time.sleep(self.hold)
                 self.emit_key(code, 0)
             else:
                 parts = token.split("+")
@@ -501,6 +528,8 @@ class WaylandDaemon:
                 codes = [wayland_keycode(name, self.ecodes) for name in names]
                 for code in codes:
                     self.emit_key(code, 1)
+                self.output.syn()
+                time.sleep(self.hold)
                 for code in reversed(codes):
                     self.emit_key(code, 0)
             self.output.syn()
@@ -614,7 +643,9 @@ def main() -> int:
         if args.list_devices:
             print_input_devices()
             return 0
-        bindings, modes, toggle, delay_ms, show_overlay, configured_device = read_config(args.config)
+        bindings, modes, toggle, delay_ms, hold_ms, show_overlay, configured_device = read_config(
+            args.config
+        )
         if args.list:
             print_bindings(bindings)
             return 0
@@ -624,18 +655,20 @@ def main() -> int:
                 modes,
                 toggle,
                 delay_ms,
+                hold_ms,
                 args.device or configured_device,
             )
         else:
-            if os.environ.get("XDG_SESSION_TYPE", "x11").lower() == "wayland":
-                raise RuntimeError(
-                    "X11 is the default backend; run with --backend wayland on this session"
-                )
+            # if os.environ.get("XDG_SESSION_TYPE", "x11").lower() == "wayland":
+            #     raise RuntimeError(
+            #         "X11 is the default backend; run with --backend wayland on this session"
+            #     )
             daemon = MacroDaemon(
                 bindings,
                 modes,
                 toggle,
                 delay_ms,
+                hold_ms,
                 Overlay(show_overlay and not args.no_overlay),
             )
         daemon.run()
