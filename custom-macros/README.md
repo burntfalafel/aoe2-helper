@@ -4,8 +4,7 @@ AOE2 Helper is a Linux-only tool for Age of Empires II: Definitive Edition runni
 Steam. It turns the six number keys into one-press building shortcuts. Select
 one or more villagers first, press a number, then place the building with the
 mouse. Tilde cycles through economy buildings, military buildings, helpers, and
-group assignment. The X11 overlay always shows the active row; on Wayland, the
-same information is printed in the terminal instead.
+group assignment. The status overlay always shows the active row.
 
 | Key | Economy mode | Military mode |
 | --- | --- | --- |
@@ -107,8 +106,12 @@ sudo usermod -aG input "$USER"
 Distribution security policies vary, so check the device permissions if it is
 still absent from `--list-devices`. Do not run the whole macro program with
 `sudo`. Membership in `input` grants broad access to input devices; a device-
-specific udev rule is safer on a shared machine. Wayland mode prints the active
-row and mappings in the terminal because the small X11 overlay is unavailable.
+specific udev rule is safer on a shared machine.
+
+On GNOME Wayland, input still uses `evdev/uinput`, while the status box is drawn
+through XWayland. This avoids XWayland input injection—the part Proton may
+ignore—while retaining the overlay GNOME can display. If XWayland or `DISPLAY`
+is unavailable, mappings remain visible in the terminal.
 
 If no accessible devices are listed, inspect permissions and current groups:
 
@@ -128,6 +131,27 @@ sudo usermod -aG input "$USER"
 If `/dev/uinput` does not exist, load its kernel module once with
 `sudo modprobe uinput`. Persistent module loading and device permissions depend
 on the Linux distribution.
+
+For the Hengchangtong keypad, the primary interface normally resembles:
+
+```text
+Hengchangtong  HCT USB Entry Keyboard ... /input0 ... event10
+```
+
+The event number can change after reconnecting or rebooting. Prefer the saved
+name `HCT USB Entry Keyboard`; the helper automatically prefers its `input0`
+interface over Consumer Control, System Control, and secondary interfaces.
+
+For a temporary permission test, replace `event10` if its number differs:
+
+```bash
+sudo setfacl -m u:"$USER":rw /dev/input/event10 /dev/uinput
+./run-linux.sh --backend wayland --device /dev/input/event10
+```
+
+This ACL can disappear after reconnecting or rebooting. If it fixes the issue,
+use input-group membership or a device-specific udev rule as the persistent
+solution. Do not run AOE2 Helper itself with `sudo`.
 
 Edit `keybindings.ini` to change labels, triggers, or sent keys. Its entry format
 is `trigger = keys_to_send | Action name`.

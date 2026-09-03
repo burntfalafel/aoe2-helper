@@ -38,9 +38,10 @@ sudo apt install python3-evdev
 ./run-linux.sh --backend wayland --device "HCT USB Entry Keyboard"
 ```
 
-Wayland does not display the X11 status box; it prints the active row in the
-terminal. It also requires access to the selected `/dev/input/event*` device and
-`/dev/uinput`.
+On GNOME Wayland, input uses `evdev/uinput` and the status box is displayed
+through XWayland. If that display fallback is unavailable, mappings are printed
+in the terminal. Wayland requires access to the selected `/dev/input/event*`
+device and `/dev/uinput`; see the detailed troubleshooting guide linked below.
 
 See [the complete setup and AoE2 hotkey assignments](custom-macros/README.md).
 

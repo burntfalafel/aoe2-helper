@@ -260,6 +260,20 @@ class Overlay:
         self.x11.XRaiseWindow(self.display, self.window)
         self.x11.XFlush(self.display)
 
+    def pump_events(self) -> None:
+        if not self.window or self.x11 is None or self.display is None:
+            return
+        event = XEvent()
+        while self.x11.XPending(self.display):
+            self.x11.XNextEvent(self.display, ctypes.byref(event))
+            if event.type == EXPOSE:
+                self.draw()
+
+    def close(self) -> None:
+        if self.x11 is not None and self.display is not None:
+            self.x11.XCloseDisplay(self.display)
+            self.display = None
+
 
 class MacroDaemon:
     def __init__(
@@ -489,6 +503,7 @@ class WaylandDaemon:
         delay_ms: int,
         hold_ms: int,
         device_spec: str,
+        show_overlay: bool,
     ) -> None:
         self.evdev = load_evdev()
         self.ecodes = self.evdev.ecodes
@@ -518,6 +533,18 @@ class WaylandDaemon:
         }
         self.modifiers_down: set[int] = set()
         self.captured_down: set[int] = set()
+        self.overlay = Overlay(False)
+        if show_overlay and os.environ.get("DISPLAY"):
+            try:
+                x11, _ = configure_x11()
+                display = x11.XOpenDisplay(None)
+                if not display:
+                    raise RuntimeError("cannot open the XWayland display")
+                self.overlay = Overlay(True)
+                self.overlay.connect(x11, display, x11.XDefaultRootWindow(display))
+                print("Wayland input with XWayland status overlay enabled.")
+            except Exception as error:
+                print(f"XWayland overlay unavailable: {error}", file=sys.stderr)
 
     def emit_key(self, code: int, value: int) -> None:
         self.output.write(self.ecodes.EV_KEY, code, value)
@@ -557,6 +584,7 @@ class WaylandDaemon:
         )
         print(f"Mode: {self.mode}{suffix}")
         print(entries)
+        self.overlay.update(self.mode, self.bindings[self.mode], action)
 
     def pass_event(self, event) -> None:
         if event.type == self.ecodes.EV_KEY:
@@ -604,6 +632,7 @@ class WaylandDaemon:
             print("AoE2 DE controls running. Tilde changes mode; Ctrl+C exits.")
             self.show_mode()
             while True:
+                self.overlay.pump_events()
                 ready, _, _ = select.select([self.device.fd], [], [], 0.05)
                 if not ready:
                     continue
@@ -617,6 +646,7 @@ class WaylandDaemon:
                 pass
             self.device.close()
             self.output.close()
+            self.overlay.close()
 
 
 def print_bindings(bindings: dict[str, dict[str, tuple[list[str], str]]]) -> None:
@@ -650,7 +680,7 @@ def main() -> int:
         action="store_true",
         help="list keyboards accessible to the Wayland backend",
     )
-    parser.add_argument("--no-overlay", action="store_true", help="disable the X11 status window")
+    parser.add_argument("--no-overlay", action="store_true", help="disable the status window")
     args = parser.parse_args()
 
     try:
@@ -671,6 +701,7 @@ def main() -> int:
                 delay_ms,
                 hold_ms,
                 args.device or configured_device,
+                show_overlay and not args.no_overlay,
             )
         else:
             # if os.environ.get("XDG_SESSION_TYPE", "x11").lower() == "wayland":
