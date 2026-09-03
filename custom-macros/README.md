@@ -1,6 +1,6 @@
-# AoE2 DE one-hand controls (Linux + Steam)
+# AOE2 Helper
 
-This Linux-only tool is for Age of Empires II: Definitive Edition running from
+AOE2 Helper is a Linux-only tool for Age of Empires II: Definitive Edition running from
 Steam. It turns the six number keys into one-press building shortcuts. Select
 one or more villagers first, press a number, then place the building with the
 mouse. Tilde cycles through economy buildings, military buildings, helpers, and
