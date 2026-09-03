@@ -91,7 +91,7 @@ List the keyboard devices your account can access:
 Then run using either the event path or a unique part of its displayed name:
 
 ```bash
-./run-linux.sh --backend wayland --device "Corne Keyboard"
+./run-linux.sh --backend wayland --device "HCT USB Entry Keyboard"
 ```
 
 To avoid typing `--device` again, put that path or name after

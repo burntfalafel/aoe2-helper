@@ -35,7 +35,7 @@ devices, and select the one-hand keyboard:
 ```bash
 sudo apt install python3-evdev
 ./run-linux.sh --backend wayland --list-devices
-./run-linux.sh --backend wayland --device "Corne Keyboard"
+./run-linux.sh --backend wayland --device "HCT USB Entry Keyboard"
 ```
 
 Wayland does not display the X11 status box; it prints the active row in the

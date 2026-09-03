@@ -410,8 +410,8 @@ def wayland_keycode(name: str, ecodes) -> int:
     return code
 
 
-def accessible_input_devices(evdev) -> list[tuple[str, str]]:
-    devices: list[tuple[str, str]] = []
+def accessible_input_devices(evdev) -> list[tuple[str, str, bool]]:
+    devices: list[tuple[str, str, bool]] = []
     # Scan directly: python-evdev releases disagree on whether list_devices()
     # requires write access. Reading and grabbing an input node only needs read
     # access; output is handled separately through /dev/uinput.
@@ -423,7 +423,10 @@ def accessible_input_devices(evdev) -> list[tuple[str, str]]:
         try:
             keys = device.capabilities().get(evdev.ecodes.EV_KEY, [])
             if keys:
-                devices.append((str(path), device.name))
+                has_macro_keys = (
+                    evdev.ecodes.KEY_1 in keys and evdev.ecodes.KEY_GRAVE in keys
+                )
+                devices.append((str(path), device.name, has_macro_keys))
         finally:
             device.close()
     return devices
@@ -441,8 +444,9 @@ def print_input_devices() -> None:
         else:
             print("No /dev/input/event* nodes exist; check that the input subsystem is available.")
         return
-    for path, name in devices:
-        print(f"{path}: {name}")
+    for path, name, has_macro_keys in devices:
+        kind = "keyboard" if has_macro_keys else "auxiliary keys"
+        print(f"{path}: {name} [{kind}]")
 
 
 def choose_input_device(evdev, device_spec: str):
@@ -457,12 +461,19 @@ def choose_input_device(evdev, device_spec: str):
         except PermissionError as error:
             raise RuntimeError(f"Permission denied reading input device: {device_spec}") from error
 
-    matches = [item for item in accessible_input_devices(evdev) if device_spec.lower() in item[1].lower()]
+    matches = [
+        item
+        for item in accessible_input_devices(evdev)
+        if device_spec.lower() in item[1].lower()
+    ]
+    keyboard_matches = [item for item in matches if item[2]]
+    if len(keyboard_matches) == 1:
+        return evdev.InputDevice(keyboard_matches[0][0])
     if len(matches) == 1:
         return evdev.InputDevice(matches[0][0])
     if not matches:
         raise RuntimeError(f"No accessible input device matches {device_spec!r}")
-    names = ", ".join(f"{path} ({name})" for path, name in matches)
+    names = ", ".join(f"{path} ({name})" for path, name, _ in matches)
     raise RuntimeError(f"Device name is ambiguous; use a path instead: {names}")
 
 
