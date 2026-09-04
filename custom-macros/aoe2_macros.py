@@ -35,6 +35,7 @@ MOUSE_BUTTONS = {
     # X11 reports the first side button as button 8; games commonly label it
     # Mouse Button 4 because wheel directions are not counted as buttons.
     "mouse_4": 8,
+    "mouse_5": 9,
 }
 
 
@@ -615,6 +616,7 @@ class WaylandDaemon:
                     "mouse_middle": self.ecodes.BTN_MIDDLE,
                     "mouse_right": self.ecodes.BTN_RIGHT,
                     "mouse_4": self.ecodes.BTN_SIDE,
+                    "mouse_5": self.ecodes.BTN_EXTRA,
                 }
                 code = buttons[lowered]
                 self.emit_key(code, 1)

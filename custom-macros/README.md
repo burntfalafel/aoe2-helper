@@ -183,7 +183,7 @@ Set these directly inside AoE2; the macro does not capture them:
 
 - `F1` to `F5`: recall control groups 1 to 5
 - `Space`: select/centre town centre
-- `Mouse Button 4`: next idle villager
+- `Extra Button 2` (Mouse Button 5): next idle villager
 - `Shift+Tab`: all idle villagers
 - `W/A/S/D`: camera movement
 - `Esc`: cancel
@@ -250,7 +250,7 @@ desired tile underneath it. Press `2` once per farm—holding it does not repeat
 The Helpers row assumes the hotkeys documented above plus:
 
 - Select all town centres: `Shift+Space`
-- Next idle villager: `Mouse Button 4`
+- Next idle villager: `Extra Button 2` (Mouse Button 5)
 - Select all idle villagers: `Shift+Tab`
 - Select all idle military: `Shift+grave`
 - Seek Shelter: `G`
