@@ -20,6 +20,7 @@ EXPOSE = 12
 EXPOSURE_MASK = 1 << 15
 GRAB_MODE_ASYNC = 1
 LOCK_MASK = 1 << 1
+SHIFT_MASK = 1 << 0
 MOD2_MASK = 1 << 4
 MODIFIER_KEYS = {
     "ctrl": "Control_L",
@@ -27,7 +28,14 @@ MODIFIER_KEYS = {
     "shift": "Shift_L",
     "alt": "Alt_L",
 }
-MOUSE_BUTTONS = {"mouse_left": 1, "mouse_middle": 2, "mouse_right": 3}
+MOUSE_BUTTONS = {
+    "mouse_left": 1,
+    "mouse_middle": 2,
+    "mouse_right": 3,
+    # X11 reports the first side button as button 8; games commonly label it
+    # Mouse Button 4 because wheel directions are not counted as buttons.
+    "mouse_4": 8,
+}
 
 
 class XKeyEvent(ctypes.Structure):
@@ -89,6 +97,7 @@ def configure_x11() -> tuple[ctypes.CDLL, ctypes.CDLL]:
     x11.XNextEvent.argtypes = [ctypes.c_void_p, ctypes.POINTER(XEvent)]
     x11.XPending.argtypes = [ctypes.c_void_p]
     x11.XPending.restype = ctypes.c_int
+    x11.XQueryKeymap.argtypes = [ctypes.c_void_p, ctypes.c_char_p]
     x11.XFlush.argtypes = [ctypes.c_void_p]
     x11.XCloseDisplay.argtypes = [ctypes.c_void_p]
     x11.XCreateSimpleWindow.argtypes = [
@@ -157,12 +166,13 @@ def read_config(
         raise RuntimeError(f"Cannot read configuration: {path}")
 
     general = config["general"]
-    modes = tuple(part.strip() for part in general.get("modes", "economy, military, groups").split(","))
+    modes = tuple(part.strip() for part in general.get("modes", "economy, military, helpers").split(","))
     if not modes or any(not mode for mode in modes) or len(set(modes)) != len(modes):
         raise RuntimeError("general.modes must contain unique, comma-separated section names")
 
     bindings: dict[str, dict[str, tuple[list[str], str]]] = {}
-    for mode in modes:
+    sections = (*modes, *(section for section in ("groups",) if section not in modes))
+    for mode in sections:
         if not config.has_section(mode):
             raise RuntimeError(f"Missing [{mode}] section in {path}")
         bindings[mode] = {}
@@ -300,6 +310,7 @@ class MacroDaemon:
         self.root = self.x11.XDefaultRootWindow(self.display)
         self.overlay.connect(self.x11, self.display, self.root)
         self.trigger_codes: dict[int, str] = {}
+        self.group_bindings = self.bindings.get("groups", {})
 
     def keycode(self, name: str) -> int:
         keysym = self.x11.XStringToKeysym(name.encode())
@@ -312,6 +323,8 @@ class MacroDaemon:
         trigger_names = {self.toggle}
         for mode in self.modes:
             trigger_names.update(self.bindings[mode])
+        group_names = set(self.group_bindings)
+        trigger_names.update(group_names)
         for name in trigger_names:
             code = self.keycode(name)
             self.trigger_codes[code] = name
@@ -326,11 +339,37 @@ class MacroDaemon:
                     GRAB_MODE_ASYNC,
                     GRAB_MODE_ASYNC,
                 )
+            if name in group_names:
+                for locks in (0, LOCK_MASK, MOD2_MASK, LOCK_MASK | MOD2_MASK):
+                    self.x11.XGrabKey(
+                        self.display,
+                        code,
+                        SHIFT_MASK | locks,
+                        self.root,
+                        False,
+                        GRAB_MODE_ASYNC,
+                        GRAB_MODE_ASYNC,
+                    )
         supported = ctypes.c_int()
         self.x11.XkbSetDetectableAutoRepeat(self.display, True, ctypes.byref(supported))
         self.x11.XFlush(self.display)
 
-    def send_sequence(self, sequence: list[str]) -> None:
+    def pressed_shift_codes(self) -> list[int]:
+        keymap = ctypes.create_string_buffer(32)
+        self.x11.XQueryKeymap(self.display, keymap)
+        pressed = []
+        for name in ("Shift_L", "Shift_R"):
+            code = self.keycode(name)
+            if keymap.raw[code // 8] & (1 << (code % 8)):
+                pressed.append(code)
+        return pressed
+
+    def send_sequence(self, sequence: list[str], release_physical_shift: bool = False) -> None:
+        shift_codes = self.pressed_shift_codes() if release_physical_shift else []
+        for code in shift_codes:
+            self.xtst.XTestFakeKeyEvent(self.display, code, False, 0)
+        if shift_codes:
+            self.x11.XFlush(self.display)
         for token in sequence:
             if token.lower() in MOUSE_BUTTONS:
                 button = MOUSE_BUTTONS[token.lower()]
@@ -351,12 +390,16 @@ class MacroDaemon:
             self.x11.XFlush(self.display)
             if self.delay:
                 time.sleep(self.delay)
+        for code in shift_codes:
+            self.xtst.XTestFakeKeyEvent(self.display, code, True, 0)
+        if shift_codes:
+            self.x11.XFlush(self.display)
 
     def run(self) -> None:
         self.grab_keys()
         self.overlay.update(self.mode, self.bindings[self.mode])
         print("AoE2 DE controls running. Tilde changes mode; Ctrl+C exits.")
-        print("Plain 1-6 use the current row; modified number keys remain available.")
+        print("Plain 1-6 use the current row; Shift+1-5 replace control groups.")
         event = XEvent()
         try:
             while True:
@@ -374,6 +417,14 @@ class MacroDaemon:
                     continue
                 self.down.add(code)
                 trigger = self.trigger_codes.get(code)
+                if event.xkey.state & SHIFT_MASK:
+                    binding = self.group_bindings.get(trigger or "")
+                    if binding:
+                        sequence, label = binding
+                        self.send_sequence(sequence, release_physical_shift=True)
+                        self.overlay.update(self.mode, self.bindings[self.mode], label)
+                        print(f"Shift+{trigger}: {label}")
+                    continue
                 if trigger == self.toggle:
                     self.mode = self.modes[(self.modes.index(self.mode) + 1) % len(self.modes)]
                     self.overlay.update(self.mode, self.bindings[self.mode])
@@ -516,9 +567,11 @@ class WaylandDaemon:
         self.device = choose_input_device(self.evdev, device_spec)
         self.output = None
         self.trigger_codes: dict[int, str] = {}
+        self.group_bindings = self.bindings.get("groups", {})
         trigger_names = {toggle}
         for mode in modes:
             trigger_names.update(bindings[mode])
+        trigger_names.update(self.group_bindings)
         for name in trigger_names:
             self.trigger_codes[wayland_keycode(name, self.ecodes)] = name
         self.modifier_codes = {
@@ -533,6 +586,10 @@ class WaylandDaemon:
         }
         self.modifiers_down: set[int] = set()
         self.captured_down: set[int] = set()
+        self.shift_codes = {
+            self.ecodes.KEY_LEFTSHIFT,
+            self.ecodes.KEY_RIGHTSHIFT,
+        }
         self.overlay = Overlay(False)
         if show_overlay and os.environ.get("DISPLAY"):
             try:
@@ -557,6 +614,7 @@ class WaylandDaemon:
                     "mouse_left": self.ecodes.BTN_LEFT,
                     "mouse_middle": self.ecodes.BTN_MIDDLE,
                     "mouse_right": self.ecodes.BTN_RIGHT,
+                    "mouse_4": self.ecodes.BTN_SIDE,
                 }
                 code = buttons[lowered]
                 self.emit_key(code, 1)
@@ -607,6 +665,21 @@ class WaylandDaemon:
             return
 
         trigger = self.trigger_codes.get(code)
+        shift_only = bool(self.modifiers_down) and self.modifiers_down <= self.shift_codes
+        if event.value == 1 and shift_only and trigger in self.group_bindings:
+            self.captured_down.add(code)
+            held_shifts = tuple(self.modifiers_down)
+            for shift_code in held_shifts:
+                self.emit_key(shift_code, 0)
+            self.output.syn()
+            sequence, label = self.group_bindings[trigger]
+            self.send_sequence(sequence)
+            for shift_code in held_shifts:
+                self.emit_key(shift_code, 1)
+            self.output.syn()
+            self.show_mode(label)
+            return
+
         if trigger is None or self.modifiers_down or event.value != 1:
             self.pass_event(event)
             return
@@ -651,7 +724,8 @@ class WaylandDaemon:
 
 def print_bindings(bindings: dict[str, dict[str, tuple[list[str], str]]]) -> None:
     for mode, entries in bindings.items():
-        print(f"{mode.title()} mode")
+        heading = "Groups shortcuts (Shift+1-5)" if mode == "groups" else f"{mode.title()} mode"
+        print(heading)
         for trigger, (sequence, label) in entries.items():
             print(f"  {trigger}: {label:<16} -> {' '.join(sequence).upper()}")
 

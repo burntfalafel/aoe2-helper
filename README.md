@@ -2,6 +2,9 @@
 
 Since the default keyboard shortcuts are either hard to remember or too far to press, I rearranged some hotkeys based on the locations and names. The key idea is to make the frequently-used hotkeys easily reachable with the left hand or use the initial letter of the name. Further, I include some strategies (build orders) to help beginners get a quick and well-organized start.
 
+<!-- Add the main project image at images/aoe2-helper-overview.png. -->
+![AOE2 Helper overview](images/aoe2-helper-overview.png)
+
 ## Linux one-hand controls
 
 `custom-macros` contains **AOE2 Helper**, a Linux-only tool for Age of Empires II: Definitive
@@ -9,12 +12,17 @@ Edition running through Steam/Proton. It is designed around a one-hand keyboard
 with `1`--`6`, tilde, `F1`--`F5`, and the left-hand letter keys while preserving
 `W/A/S/D` for camera movement.
 
-Tilde cycles through four rows whose mappings are shown while the program runs:
+<!-- Add a photo or layout diagram at images/one-hand-keyboard.png. -->
+![One-hand keyboard layout](images/one-hand-keyboard.png)
+
+Tilde cycles through three rows whose mappings are shown while the program runs:
 
 - Economy buildings
 - Military buildings
 - Economy and positioning helpers
-- Control-group assignment
+
+Control-group assignment is always available: select units or villagers and
+press `Shift+1`--`Shift+5` to replace that group. Use `F1`--`F5` to recall it.
 
 The multi-action helpers are intended for single-player/offline games, not
 ranked multiplayer or tournaments.
@@ -28,6 +36,9 @@ cd custom-macros
 
 X11 displays a solid dark status box measuring 650 by 82 pixels near the left
 edge of the screen. It is not transparent and does not cover the whole screen.
+
+<!-- Add an in-game overlay screenshot at images/aoe2-helper-overlay.png. -->
+![AOE2 Helper status overlay in game](images/aoe2-helper-overlay.png)
 
 For Wayland on Debian or Ubuntu, install `python-evdev`, list accessible input
 devices, and select the one-hand keyboard:

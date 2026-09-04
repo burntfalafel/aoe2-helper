@@ -3,8 +3,8 @@
 AOE2 Helper is a Linux-only tool for Age of Empires II: Definitive Edition running from
 Steam. It turns the six number keys into one-press building shortcuts. Select
 one or more villagers first, press a number, then place the building with the
-mouse. Tilde cycles through economy buildings, military buildings, helpers, and
-group assignment. The status overlay always shows the active row.
+mouse. Tilde cycles through the economy-building, military-building, and helper
+rows. The status overlay always shows the active row.
 
 | Key | Economy mode | Military mode |
 | --- | --- | --- |
@@ -15,23 +15,24 @@ group assignment. The status overlay always shows the active row.
 | `5` | Mining Camp | Castle |
 | `6` | Dock | Watch Tower |
 
-The fourth mode assigns the selected units or villagers to a control group:
+Control-group assignment is available permanently, regardless of the active
+row:
 
 | Key | Group command |
 | --- | --- |
-| `1` | Replace group 1 |
-| `2` | Replace group 2 |
-| `3` | Replace group 3 |
-| `4` | Replace group 4 |
-| `5` | Replace group 5 |
+| `Shift+1` | Replace group 1 |
+| `Shift+2` | Replace group 2 |
+| `Shift+3` | Replace group 3 |
+| `Shift+4` | Replace group 4 |
+| `Shift+5` | Replace group 5 |
 
-Configure AoE2's **Select Group 1--5** commands as `F1`--`F5`. The workflow is:
-select some units or villagers, switch the overlay to Groups and press `1`--`5`
-to assign them; later press the corresponding `F1`--`F5` to recall them.
+Configure AoE2's **Select Group 1--5** commands as `F1`--`F5`. Select some units
+or villagers and press `Shift+1`--`Shift+5` to assign them; later press the
+corresponding `F1`--`F5` to recall them. You do not need to change rows first.
 
 The layout deliberately avoids `W`, `A`, `S`, and `D`, leaving them available
-for camera movement. Modified number keys are not captured, so `Ctrl+1` and
-`Shift+1` can still be used for control groups.
+for camera movement. `Ctrl+number` and other modified number keys pass through;
+`Shift+1`--`Shift+5` are the permanent group-assignment shortcuts.
 
 ## One-time AoE2 hotkey setup
 
@@ -45,7 +46,8 @@ in the same command context if the game reports one.
 | House / Barracks | `Q` |
 | Farm / Archery Range | `E` |
 | Lumber Camp / Stable | `R` |
-| Mill / Siege Workshop | `T` |
+| Mill | `W` |
+| Siege Workshop | `T` |
 | Mining Camp / Castle | `F` |
 | Dock / Watch Tower | `G` |
 
@@ -181,7 +183,7 @@ Set these directly inside AoE2; the macro does not capture them:
 
 - `F1` to `F5`: recall control groups 1 to 5
 - `Space`: select/centre town centre
-- `Tab`: next idle villager
+- `Mouse Button 4`: next idle villager
 - `Shift+Tab`: all idle villagers
 - `W/A/S/D`: camera movement
 - `Esc`: cancel
@@ -248,7 +250,7 @@ desired tile underneath it. Press `2` once per farm—holding it does not repeat
 The Helpers row assumes the hotkeys documented above plus:
 
 - Select all town centres: `Shift+Space`
-- Next idle villager: `Tab`
+- Next idle villager: `Mouse Button 4`
 - Select all idle villagers: `Shift+Tab`
 - Select all idle military: `Shift+grave`
 - Seek Shelter: `G`
