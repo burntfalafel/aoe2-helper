@@ -167,22 +167,45 @@ def read_config(
         raise RuntimeError(f"Cannot read configuration: {path}")
 
     general = config["general"]
-    modes = tuple(part.strip() for part in general.get("modes", "economy, military, helpers").split(","))
-    if not modes or any(not mode for mode in modes) or len(set(modes)) != len(modes):
+    configured_modes = tuple(
+        part.strip()
+        for part in general.get("modes", "economy, military, helpers").split(",")
+    )
+    if (
+        not configured_modes
+        or any(not mode for mode in configured_modes)
+        or len(set(configured_modes)) != len(configured_modes)
+    ):
         raise RuntimeError("general.modes must contain unique, comma-separated section names")
 
-    bindings: dict[str, dict[str, tuple[list[str], str]]] = {}
-    sections = (*modes, *(section for section in ("groups",) if section not in modes))
+    def layer_enabled(name: str) -> bool:
+        return not config.has_section("layers") or config.getboolean(
+            "layers", name, fallback=True
+        )
+
+    modes = tuple(mode for mode in configured_modes if layer_enabled(mode))
+    if not modes:
+        raise RuntimeError("At least one mode layer must be enabled in [layers]")
+
+    all_bindings: dict[str, dict[str, tuple[list[str], str]]] = {}
+    sections = (
+        *configured_modes,
+        *(section for section in ("groups",) if section not in configured_modes),
+    )
     for mode in sections:
         if not config.has_section(mode):
             raise RuntimeError(f"Missing [{mode}] section in {path}")
-        bindings[mode] = {}
+        all_bindings[mode] = {}
         for trigger, value in config.items(mode):
             sequence_text, separator, label = value.partition("|")
             sequence = sequence_text.split()
             if not separator or not sequence or not label.strip():
                 raise RuntimeError(f"Invalid {mode} binding for {trigger!r}")
-            bindings[mode][trigger.strip()] = (sequence, label.strip())
+            all_bindings[mode][trigger.strip()] = (sequence, label.strip())
+
+    bindings = {mode: all_bindings[mode] for mode in modes}
+    if layer_enabled("groups"):
+        bindings["groups"] = all_bindings["groups"]
 
     toggle = general.get("toggle", "grave").strip()
     delay_ms = general.getint("key_delay_ms", 35)
@@ -726,7 +749,7 @@ class WaylandDaemon:
 
 def print_bindings(bindings: dict[str, dict[str, tuple[list[str], str]]]) -> None:
     for mode, entries in bindings.items():
-        heading = "Groups shortcuts (Shift+1-5)" if mode == "groups" else f"{mode.title()} mode"
+        heading = "Group shortcuts (Shift+number)" if mode == "groups" else f"{mode.title()} mode"
         print(heading)
         for trigger, (sequence, label) in entries.items():
             print(f"  {trigger}: {label:<16} -> {' '.join(sequence).upper()}")

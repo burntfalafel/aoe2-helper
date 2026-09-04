@@ -42,14 +42,19 @@ in the same command context if the game reports one.
 | AoE2 command | Key |
 | --- | --- |
 | Economy Buildings menu | `Q` |
-| Military Buildings menu | `E` |
-| House / Barracks | `Q` |
-| Farm / Archery Range | `E` |
-| Lumber Camp / Stable | `R` |
+| Military Buildings menu | `W` |
+| House | `Q` |
+| Farm | `A` |
+| Lumber Camp | `R` |
 | Mill | `W` |
-| Siege Workshop | `T` |
-| Mining Camp / Castle | `F` |
-| Dock / Watch Tower | `G` |
+| Mining Camp | `E` |
+| Dock | `T` |
+| Barracks | `Q` |
+| Archery Range | `W` |
+| Stable | `E` |
+| Siege Workshop | `R` |
+| Castle | `C` |
+| Watch Tower | `F` |
 
 The same target key can be reused because economy and military buildings are in
 different menus. Keep your camera assignments on `W/A/S/D`.
@@ -67,6 +72,20 @@ Leave the terminal open while playing. Press `Ctrl+C` in it to stop. The small
 overlay shows the current mode and all six mappings, so it doubles as the only
 reference card you need. Run `./run-linux.sh --list` to check the layout without
 capturing any keys.
+
+To disable a layer, change its value under `[layers]` in `keybindings.ini`:
+
+```ini
+[layers]
+economy = yes
+military = yes
+helpers = no
+groups = yes
+```
+
+Tilde skips disabled mode layers. Setting `groups = no` disables the permanent
+`Shift+number` group shortcuts. At least one of economy, military, or helpers
+must remain enabled.
 
 The default backend is X11 and uses libraries already supplied by Ubuntu. It
 does not need `sudo` or extra Python packages.
@@ -256,6 +275,13 @@ The Helpers row assumes the hotkeys documented above plus:
 - Seek Shelter: `G`
 - Garrison: `T`
 - Move command: right-click
+
+There is no fixed limit on the number of inputs in a helper sequence. If a
+helper fails, first perform its listed inputs manually in the same order. This
+usually reveals a hotkey mismatch. In particular, helper `2` must use `Q`, then
+`A` for Farm; an older version incorrectly sent `Q`, then `E`. If every manual
+step works but AoE drops a generated step, increase `key_delay_ms` in
+`keybindings.ini` from `50` to `100` or `150`.
 
 The existing building feature sends two game inputs from one physical input.
 Use that, or any longer sequence such as selecting units and then issuing an
