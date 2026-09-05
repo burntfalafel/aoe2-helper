@@ -11,8 +11,8 @@ rows. The status overlay always shows the active row.
 | `1` | House | Barracks |
 | `2` | Farm | Archery Range |
 | `3` | Lumber Camp | Stable |
-| `4` | Mill | Siege Workshop |
-| `5` | Mining Camp | Castle |
+| `4` | Mill | Palisade Wall |
+| `5` | Mining Camp | Stone Wall |
 | `6` | Dock | Watch Tower |
 
 Control-group assignment is available permanently, regardless of the active
@@ -52,8 +52,8 @@ in the same command context if the game reports one.
 | Barracks | `Q` |
 | Archery Range | `W` |
 | Stable | `E` |
-| Siege Workshop | `R` |
-| Castle | `C` |
+| Palisade Wall | `Z` |
+| Stone Wall | `C` |
 | Watch Tower | `F` |
 
 The same target key can be reused because economy and military buildings are in
